@@ -88,3 +88,69 @@ export const successShare = (c: ChannelRow, totalSuccessRev: number) =>
 /** Lợi nhuận kênh (cột N). */
 export const channelProfit = (c: ChannelRow) =>
   c.success.revenue - c.cogs - c.adsCost - c.platformFee;
+
+/* ------------------------- Gộp nhiều ngày & cross-filter ------------------------- */
+import type { Report as _Report } from "./types";
+
+/** Gộp danh sách ChannelRow của nhiều ngày thành 1 mảng kênh tổng (cộng dồn). */
+export function mergeChannels(daysChannels: ChannelRow[][]): ChannelRow[] {
+  if (daysChannels.length === 0) return [];
+  const names = daysChannels[0].map((c) => c.name);
+  return names.map((name) => {
+    const acc: ChannelRow = {
+      name,
+      created: { orders: 0, revenue: 0 },
+      cancelled: { orders: 0, revenue: 0 },
+      success: { orders: 0, revenue: 0 },
+      cogs: 0, adsCost: 0, platformFee: 0,
+    };
+    for (const day of daysChannels) {
+      const c = day.find((x) => x.name === name);
+      if (!c) continue;
+      acc.created.orders += c.created.orders; acc.created.revenue += c.created.revenue;
+      acc.cancelled.orders += c.cancelled.orders; acc.cancelled.revenue += c.cancelled.revenue;
+      acc.success.orders += c.success.orders; acc.success.revenue += c.success.revenue;
+      acc.cogs += c.cogs; acc.adsCost += c.adsCost; acc.platformFee += c.platformFee;
+    }
+    return acc;
+  });
+}
+
+/**
+ * Dựng báo cáo tổng hợp từ NHIỀU report-ngày đã build sẵn (bản static).
+ * - lọc theo khoảng ngày [from,to]
+ * - nếu channelFilter có giá trị -> chỉ giữ kênh đó (cross-filter)
+ * Lương/Vận hành: cộng dồn giá trị ngày của các ngày được chọn.
+ */
+export function aggregateReports(
+  days: _Report[],
+  from: string,
+  to: string,
+  channelFilter?: string | null
+): _Report {
+  const picked = days.filter((d) => d.fromDate >= from && d.fromDate <= to);
+  const base = picked.length ? picked : days.slice(-1);
+
+  let channels = mergeChannels(base.map((d) => d.channels));
+  if (channelFilter) channels = channels.filter((c) => c.name === channelFilter);
+
+  // Lương & Vận hành mỗi ngày nằm ở pnl dòng 6,7 -> cộng dồn theo số ngày chọn
+  const salaryDaily = base.reduce((s, d) => s + (d.pnl.find((p) => p.no === 6)?.value || 0), 0);
+  const opexDaily = base.reduce((s, d) => s + (d.pnl.find((p) => p.no === 7)?.value || 0), 0);
+  // Nếu đang lọc 1 kênh -> không phân bổ lương/vận hành cho kênh (giữ 0 để LN kênh sạch)
+  const useSalary = channelFilter ? 0 : salaryDaily;
+  const useOpex = channelFilter ? 0 : opexDaily;
+
+  const mock = base.some((d) => d.meta.mock);
+  const notes = base[0]?.meta.notes || [];
+
+  return buildReport({
+    fromDate: base[0]?.fromDate || from,
+    toDate: base[base.length - 1]?.fromDate || to,
+    channels,
+    salaryDaily: useSalary,
+    opexDaily: useOpex,
+    mock,
+    notes,
+  });
+}

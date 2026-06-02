@@ -9,20 +9,25 @@ import { TDG, TDG_CHART_COLORS } from "@/lib/colors";
 import { channelProfit } from "@/lib/report";
 
 const tip = {
-  background: TDG.card, border: `1px solid ${TDG.accent}`,
+  background: TDG.card, border: `1px solid ${TDG.border}`,
   borderRadius: 12, color: TDG.text, fontSize: 12,
+  boxShadow: "0 4px 16px rgba(43,38,32,0.10)",
 };
 const axisX = { fill: TDG.secondary, fontSize: 11 };
+const GRID = TDG.grid;
 
 function Card({ title, sub, children }: { title: string; sub?: string; children: React.ReactNode }) {
   return (
-    <div className="bg-tdg-card rounded-ios-lg border border-tdg-border p-4 animate-fade-up">
+    <div className="bg-tdg-card rounded-ios-lg border border-tdg-border shadow-ios p-4 animate-fade-up">
       <h3 className="text-sm font-bold text-tdg-text">{title}</h3>
       {sub && <p className="text-[11px] text-tdg-secondary mb-2 mt-0.5">{sub}</p>}
       <div className={sub ? "" : "mt-3"}>{children}</div>
     </div>
   );
 }
+
+// làm mờ cột không được chọn khi cross-filter
+const op = (name: string, active?: string | null) => (active && active !== name ? 0.28 : 1);
 
 const renderPct =
   (total: number) =>
@@ -59,7 +64,9 @@ function Donut({ data }: { data: { label: string; value: number }[] }) {
   );
 }
 
-export function RevenueByChannel({ channels }: { channels: ChannelRow[] }) {
+export function RevenueByChannel({
+  channels, activeChannel, onSelectChannel,
+}: { channels: ChannelRow[]; activeChannel?: string | null; onSelectChannel?: (n: string) => void }) {
   const data = channels
     .map((c) => ({ name: c.name, value: Math.round(c.success.revenue) }))
     .sort((a, b) => b.value - a.value);
@@ -67,11 +74,13 @@ export function RevenueByChannel({ channels }: { channels: ChannelRow[] }) {
     <Card title="Doanh thu thành công theo kênh" sub="Sắp xếp giảm dần · VNĐ">
       <ResponsiveContainer width="100%" height={260}>
         <BarChart data={data} margin={{ top: 20, left: 4, right: 8 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="rgba(200,162,77,0.06)" vertical={false} />
+          <CartesianGrid strokeDasharray="3 3" stroke={GRID} vertical={false} />
           <XAxis dataKey="name" tick={axisX} axisLine={false} tickLine={false} interval={0} />
           <YAxis tickFormatter={fmtVND} tick={axisX} axisLine={false} tickLine={false} width={44} />
-          <Tooltip contentStyle={tip} formatter={(v: number) => fmtVNDFull(v)} cursor={{ fill: "rgba(200,162,77,0.06)" }} />
-          <Bar dataKey="value" fill={TDG.accent} radius={[8, 8, 0, 0]} maxBarSize={48} isAnimationActive={false}>
+          <Tooltip contentStyle={tip} formatter={(v: number) => fmtVNDFull(v)} cursor={{ fill: "rgba(176,134,47,0.07)" }} />
+          <Bar dataKey="value" radius={[8, 8, 0, 0]} maxBarSize={48} isAnimationActive={false}
+            onClick={(d: any) => onSelectChannel?.(d.name)} cursor={onSelectChannel ? "pointer" : undefined}>
+            {data.map((d, i) => <Cell key={i} fill={TDG.accentSoft} fillOpacity={op(d.name, activeChannel)} />)}
             <LabelList dataKey="value" position="top" fill={TDG.text} fontSize={10}
               formatter={(v: number) => (v ? fmtVND(v) : "")} />
           </Bar>
@@ -81,7 +90,9 @@ export function RevenueByChannel({ channels }: { channels: ChannelRow[] }) {
   );
 }
 
-export function ProfitByChannel({ channels }: { channels: ChannelRow[] }) {
+export function ProfitByChannel({
+  channels, activeChannel, onSelectChannel,
+}: { channels: ChannelRow[]; activeChannel?: string | null; onSelectChannel?: (n: string) => void }) {
   const data = channels
     .map((c) => ({ name: c.name, value: Math.round(channelProfit(c)) }))
     .sort((a, b) => b.value - a.value);
@@ -89,12 +100,15 @@ export function ProfitByChannel({ channels }: { channels: ChannelRow[] }) {
     <Card title="Lợi nhuận theo kênh" sub="Xanh = lãi · Đỏ = lỗ · VNĐ">
       <ResponsiveContainer width="100%" height={260}>
         <BarChart data={data} margin={{ top: 20, left: 4, right: 8 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="rgba(200,162,77,0.06)" vertical={false} />
+          <CartesianGrid strokeDasharray="3 3" stroke={GRID} vertical={false} />
           <XAxis dataKey="name" tick={axisX} axisLine={false} tickLine={false} interval={0} />
           <YAxis tickFormatter={fmtVND} tick={axisX} axisLine={false} tickLine={false} width={44} />
-          <Tooltip contentStyle={tip} formatter={(v: number) => fmtVNDFull(v)} cursor={{ fill: "rgba(200,162,77,0.06)" }} />
-          <Bar dataKey="value" radius={[8, 8, 0, 0]} maxBarSize={48} isAnimationActive={false}>
-            {data.map((d, i) => <Cell key={i} fill={d.value >= 0 ? TDG.positive : TDG.negative} />)}
+          <Tooltip contentStyle={tip} formatter={(v: number) => fmtVNDFull(v)} cursor={{ fill: "rgba(176,134,47,0.07)" }} />
+          <Bar dataKey="value" radius={[8, 8, 0, 0]} maxBarSize={48} isAnimationActive={false}
+            onClick={(d: any) => onSelectChannel?.(d.name)} cursor={onSelectChannel ? "pointer" : undefined}>
+            {data.map((d, i) => (
+              <Cell key={i} fill={d.value >= 0 ? TDG.positive : TDG.negative} fillOpacity={op(d.name, activeChannel)} />
+            ))}
             <LabelList dataKey="value" position="top" fill={TDG.text} fontSize={10}
               formatter={(v: number) => (v ? fmtVND(v) : "")} />
           </Bar>
@@ -129,15 +143,15 @@ export function TrendChart({ data }: { data: { date: string; revenue: number; pr
         <AreaChart data={data} margin={{ left: 4, right: 8 }}>
           <defs>
             <linearGradient id="tdgRev" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor={TDG.accent} stopOpacity={0.4} />
-              <stop offset="100%" stopColor={TDG.accent} stopOpacity={0} />
+              <stop offset="0%" stopColor={TDG.accentSoft} stopOpacity={0.35} />
+              <stop offset="100%" stopColor={TDG.accentSoft} stopOpacity={0} />
             </linearGradient>
           </defs>
-          <CartesianGrid strokeDasharray="3 3" stroke="rgba(200,162,77,0.06)" vertical={false} />
+          <CartesianGrid strokeDasharray="3 3" stroke={GRID} vertical={false} />
           <XAxis dataKey="date" tickFormatter={fmtDay} tick={axisX} axisLine={false} tickLine={false} />
           <YAxis tickFormatter={fmtVND} tick={axisX} axisLine={false} tickLine={false} width={44} />
           <Tooltip contentStyle={tip} formatter={(v: number) => fmtVNDFull(v)} labelFormatter={fmtDay} />
-          <Area type="monotone" dataKey="revenue" name="Doanh thu" stroke={TDG.accent} strokeWidth={2} fill="url(#tdgRev)" dot={false} />
+          <Area type="monotone" dataKey="revenue" name="Doanh thu" stroke={TDG.accentSoft} strokeWidth={2} fill="url(#tdgRev)" dot={false} />
           <Line type="monotone" dataKey="profit" name="Lợi nhuận" stroke={TDG.positive} strokeWidth={2} dot={false} />
         </AreaChart>
       </ResponsiveContainer>

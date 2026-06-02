@@ -3,22 +3,22 @@ import type { PnLLine } from "@/lib/types";
 import { fmtVNDFull, fmtPct } from "@/lib/types";
 
 const srcBadge: Record<PnLLine["source"], { t: string; c: string }> = {
-  bigquery: { t: "BigQuery", c: "text-tdg-accent bg-[rgba(200,162,77,0.12)]" },
-  sheets: { t: "Sheet", c: "text-tdg-warm bg-[rgba(212,130,90,0.14)]" },
-  formula: { t: "Công thức", c: "text-tdg-secondary bg-[rgba(138,133,120,0.14)]" },
+  bigquery: { t: "BigQuery", c: "text-tdg-accent bg-[#F4EDDC]" },
+  sheets: { t: "Sheet", c: "text-tdg-warm bg-[#F7E6DC]" },
+  formula: { t: "Công thức", c: "text-tdg-secondary bg-[#EFEADF]" },
 };
 
 export function PnLTable({ pnl }: { pnl: PnLLine[] }) {
   const net = pnl.find((p) => p.no === 3)?.value || 0; // doanh thu thuần làm mẫu số
   const highlight = new Set([3, 5, 10]);
   return (
-    <div className="bg-tdg-card rounded-ios-lg border border-tdg-border overflow-hidden animate-fade-up">
+    <div className="bg-tdg-card rounded-ios-lg border border-tdg-border shadow-ios overflow-hidden animate-fade-up">
       <div className="px-4 py-3 border-b border-tdg-border">
         <h2 className="text-[15px] font-bold text-tdg-text">Phần 2 — Kết quả hoạt động kinh doanh</h2>
       </div>
       <table className="w-full border-collapse">
         <thead>
-          <tr className="border-b border-tdg-border bg-[rgba(200,162,77,0.04)]">
+          <tr className="border-b border-tdg-border bg-tdg-card-alt">
             <th className="px-4 py-2 text-left text-[11px] uppercase tracking-wide text-tdg-secondary font-semibold">Nội dung</th>
             <th className="px-4 py-2 text-right text-[11px] uppercase tracking-wide text-tdg-secondary font-semibold">Giá trị (VNĐ)</th>
             <th className="px-4 py-2 text-right text-[11px] uppercase tracking-wide text-tdg-secondary font-semibold">% / DTT</th>
@@ -31,7 +31,7 @@ export function PnLTable({ pnl }: { pnl: PnLLine[] }) {
             const isProfit = l.no === 10;
             return (
               <tr key={l.no}
-                  className={`border-b border-tdg-border/60 ${highlight.has(l.no) ? "bg-[rgba(200,162,77,0.06)]" : ""}`}>
+                  className={`border-b border-tdg-border/70 ${highlight.has(l.no) ? "bg-tdg-card-alt" : ""}`}>
                 <td className={`px-4 py-2.5 text-sm ${highlight.has(l.no) ? "font-bold text-tdg-text" : "text-tdg-text"}`}>
                   {l.no}. {l.label}
                 </td>
