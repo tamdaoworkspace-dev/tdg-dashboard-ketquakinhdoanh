@@ -12,7 +12,8 @@
     "next": "14.2.5",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "recharts": "^2.12.7"
+    "chart.js": "^4.4.1",
+    "chartjs-plugin-datalabels": "^2.2.0"
   },
   "devDependencies": {
     "@google-cloud/bigquery": "^7.9.1",

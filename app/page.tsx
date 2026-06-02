@@ -6,7 +6,7 @@ import { Header } from "@/components/Header";
 import { KPICard } from "@/components/KPICard";
 import { ChannelTable } from "@/components/ChannelTable";
 import { PnLTable } from "@/components/PnLTable";
-import { RevenueByChannel, ProfitByChannel, CostDonut, TrendChart } from "@/components/Charts";
+import { RevenueByChannel, ProfitByChannel, CostDonut, RevenueShareDonut, TrendChart } from "@/components/Charts";
 
 interface Bundle { generatedAt: string; days: Report[]; }
 
@@ -86,15 +86,16 @@ export default function Dashboard() {
 
           <div className="mb-6"><ChannelTable channels={data.channels} /></div>
 
-          <div className="grid lg:grid-cols-3 gap-4 mb-6">
-            <div className="lg:col-span-2"><RevenueByChannel channels={data.channels} /></div>
+          <div className="grid lg:grid-cols-2 gap-4 mb-4">
+            <RevenueByChannel channels={data.channels} />
             <CostDonut data={data.costBreakdown} />
           </div>
-
           <div className="grid lg:grid-cols-2 gap-4 mb-6">
-            <PnLTable pnl={data.pnl} />
             <ProfitByChannel channels={data.channels} />
+            <RevenueShareDonut channels={data.channels} />
           </div>
+
+          <div className="mb-6"><PnLTable pnl={data.pnl} /></div>
 
           <div className="text-center text-tdg-secondary text-[11px] pt-4 border-t border-tdg-border">
             TDG Dashboard (static) · Nguồn: BigQuery + Google Sheets · build {new Date(bundle!.generatedAt).toLocaleString("vi-VN")}
