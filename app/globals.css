@@ -1,0 +1,17 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --tdg-bg: #0A0A08; --tdg-card: #1A1814; --tdg-text: #F5F0E8;
+  --tdg-secondary: #8A8578; --tdg-accent: #C8A24D;
+  --tdg-border: rgba(200,162,77,0.1);
+  --tdg-positive: #5D8A3C; --tdg-negative: #C45C3A;
+}
+body { background: var(--tdg-bg); color: var(--tdg-text); -webkit-font-smoothing: antialiased; }
+::-webkit-scrollbar { height: 8px; width: 8px; }
+::-webkit-scrollbar-thumb { background: rgba(200,162,77,0.2); border-radius: 8px; }
+@keyframes fadeUp { from { opacity: 0; transform: translateY(16px);} to { opacity:1; transform:none;} }
+@keyframes scaleIn { from { opacity:0; transform: scale(.96);} to {opacity:1; transform:none;} }
+.animate-fade-up { animation: fadeUp .5s ease both; }
+.animate-scale-in { animation: scaleIn .4s ease both; }
