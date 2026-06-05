@@ -10,7 +10,7 @@ import { resolve } from "node:path";
 import { buildReport } from "../lib/report";
 import { MOCK_CHANNELS, MOCK_SALARY_DAILY, MOCK_OPEX_DAILY } from "../lib/mock";
 import {
-  CHANNELS, NHANH_STORES, NHANH_DATE_COL, SALE_CHANNEL_MAP,
+  CHANNELS, NHANH_STORES, NHANH_DATE_COL, SALE_CHANNEL_MAP, resolveChannel,
   STATUS_SUCCESS, STATUS_CANCELLED, ADS_ENABLED, PLATFORM_FEE_ENABLED,
   SHEET_RANGE, ALLOCATION, type ChannelName,
 } from "../lib/config";
@@ -37,16 +37,31 @@ const emptyRow = (name: ChannelName): ChannelRow => ({
   success: { orders: 0, revenue: 0 }, cogs: 0, adsCost: 0, platformFee: 0,
 });
 
+/** Đọc GOOGLE_CREDENTIALS: chấp nhận JSON thô HOẶC JSON đã mã hoá base64. */
+function parseCreds() {
+  const raw = (process.env.GOOGLE_CREDENTIALS || "").trim();
+  try {
+    return JSON.parse(raw); // kiểu JSON thô
+  } catch {
+    try {
+      return JSON.parse(Buffer.from(raw, "base64").toString("utf8")); // kiểu base64
+    } catch {
+      throw new Error("GOOGLE_CREDENTIALS không hợp lệ (phải là JSON thô hoặc JSON mã hoá base64)");
+    }
+  }
+}
+
 async function fetchNhanhByDay(from: string, to: string) {
   const { BigQuery } = await import("@google-cloud/bigquery");
   const bq = new BigQuery({
-    credentials: JSON.parse(process.env.GOOGLE_CREDENTIALS!),
+    credentials: parseCreds(),
     projectId: PROJ,
   });
   const union = NHANH_STORES.map(
     (sid) => `
     SELECT
       DATE(SAFE.PARSE_TIMESTAMP('%Y-%m-%d %H:%M:%S', ${NHANH_DATE_COL})) AS d,
+      '${sid}' AS store,
       sale_channel, order_status, order_id,
       SAFE_CAST(product_price AS FLOAT64) AS price,
       SAFE_CAST(product_qty AS FLOAT64) AS qty,
@@ -57,15 +72,20 @@ async function fetchNhanhByDay(from: string, to: string) {
   ).join("\nUNION ALL\n");
 
   const query = `
-    WITH lines AS (${union}),
+    WITH raw AS (${union}),
+    dedup AS (  -- bảng bị nhân đôi dòng (~1.94x) -> gộp dòng trùng lặp trước khi cộng
+      SELECT d, store, sale_channel, order_status, order_id, price, qty, avg_cost
+      FROM raw
+      GROUP BY d, store, sale_channel, order_status, order_id, price, qty, avg_cost
+    ),
     per_order AS (
-      SELECT d, sale_channel, order_status, order_id,
+      SELECT d, store, sale_channel, order_status, order_id,
         SUM(price*qty) AS rev, SUM(avg_cost*qty) AS cogs
-      FROM lines GROUP BY d, sale_channel, order_status, order_id
+      FROM dedup GROUP BY d, store, sale_channel, order_status, order_id
     )
-    SELECT d, sale_channel, order_status,
+    SELECT d, store, sale_channel, order_status,
       COUNT(*) AS orders, SUM(rev) AS revenue, SUM(cogs) AS cogs
-    FROM per_order GROUP BY d, sale_channel, order_status`;
+    FROM per_order GROUP BY d, store, sale_channel, order_status`;
 
   const [rows] = await bq.query({
     query, params: { from: `${from} 00:00:00`, to: `${to} 23:59:59` },
@@ -77,7 +97,7 @@ async function fetchMonthlyCosts() {
   // Trả map { 'YYYY-MM': {salaryTotal, opexTotal} }
   const { google } = await import("googleapis");
   const auth = new google.auth.GoogleAuth({
-    credentials: JSON.parse(process.env.GOOGLE_CREDENTIALS!),
+    credentials: parseCreds(),
     scopes: ["https://www.googleapis.com/auth/spreadsheets.readonly"],
   });
   const sheets = google.sheets({ version: "v4", auth });
@@ -136,7 +156,7 @@ async function main() {
     for (const r of rows) {
       const day = typeof r.d === "string" ? r.d : r.d?.value; // BQ DATE -> {value}
       const m = byDay.get(day); if (!m) continue;
-      const ch = SALE_CHANNEL_MAP[String(r.sale_channel)]; if (!ch) continue;
+      const ch = resolveChannel(String(r.store), String(r.sale_channel)); if (!ch) continue;
       const row = m.get(ch)!;
       const orders = Number(r.orders) || 0, revenue = Number(r.revenue) || 0, cogs = Number(r.cogs) || 0;
       const st = String(r.order_status);
