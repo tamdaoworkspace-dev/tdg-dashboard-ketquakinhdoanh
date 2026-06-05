@@ -34,23 +34,57 @@ export type ChannelName = (typeof CHANNELS)[number];
  *  ⚠️ XÁC NHẬN: dùng 1 store hay cộng cả 2.
  * ---------------------------------------------------------------------------
  */
-export const NHANH_STORES = ["144344"]; // ["144344", "219805"] nếu cộng cả 2
+export const NHANH_STORES = ["144344", "219805"]; // cộng cả 2 store
+
+/**
+ *  Store (businessId) -> thương hiệu, dùng để tách "TikTok TDG" vs "TikTok TDQ".
+ *  ⚠️ Theo xác nhận của user: 219805 = TDG, 144344 = TDQ.
+ *  (Nếu phát hiện gán ngược thì chỉ cần đổi 2 dòng dưới đây.)
+ */
+export const STORE_BRAND: Record<string, "TDG" | "TDQ"> = {
+  "219805": "TDG",
+  "144344": "TDQ",
+};
 
 /**
  * ---------------------------------------------------------------------------
  *  NHANH.VN — Mã sale_channel (STRING số) -> tên kênh báo cáo
- *  Giá trị thực có trong data: "1", "10", "20", "42", "48".
- *  ⚠️ TODO XÁC NHẬN với Nhanh.vn (Cấu hình > Nguồn đơn) ý nghĩa từng mã.
- *  Mã không khai báo ở đây sẽ gom vào "_unmapped" (không tính vào kênh nào).
+ *  Bảng chính thức (apidocs.nhanh.vn/v3/modelconstant > Order Sale Channel):
+ *    1=Admin  2=Website  10=API  20=Facebook  21=Instagram  41=Lazada
+ *    42=Shopee  43=Sendo  45=Tiki  48=Tiktok Shop  49=Zalo OA ...
+ *  Trong data TDG chỉ xuất hiện 5 mã: 1, 10, 20, 42, 48.
+ *
+ *  ⚠️ LƯU Ý cấu trúc: báo cáo có 7 kênh nhưng sale_channel chỉ phân biệt được 5.
+ *     - "TikTok TDG" vs "TikTok TDQ": cùng mã 48, KHÁC NHAU ở STORE
+ *       (TDG = store 144344, TDQ = store 219805 — CẦN XÁC NHẬN).
+ *       Hiện gộp toàn bộ 48 vào "TikTok TDG"; muốn tách TDQ cần map theo store.
+ *     - "Sỉ": chưa có nguồn rõ (có thể theo order_type=bán sỉ) — CHƯA map.
  * ---------------------------------------------------------------------------
  */
 export const SALE_CHANNEL_MAP: Record<string, ChannelName> = {
-  // "48": "TikTok TDG",   // mã nhiều đơn nhất — RẤT CÓ THỂ là TikTok
-  // "1":  "CSKH",
-  // "42": "Shopee",
-  // "20": "Facebook",
-  // "10": "Sỉ",
+  "42": "Shopee",      // chính thức = Shopee
+  "20": "Facebook",    // chính thức = Facebook
+  "1": "CSKH",         // Admin = đơn tạo tay (NV CSKH) — CẦN XÁC NHẬN
+  "10": "MKT",         // API = đơn đẩy qua API/website — CẦN XÁC NHẬN
+  // "48" (Tiktok Shop) KHÔNG để ở đây — tách theo store trong resolveChannel().
+  // "Sỉ": chưa map (có thể theo order_type=bán sỉ).
 };
+
+/**
+ * Quy đổi (store, sale_channel) -> kênh báo cáo.
+ * - Tiktok Shop (48) tách theo store: 219805=TDG, 144344=TDQ.
+ * - Các kênh khác lấy theo SALE_CHANNEL_MAP.
+ * Trả null nếu không map được (đơn sẽ không tính vào kênh nào).
+ */
+export function resolveChannel(store: string, saleChannel: string): ChannelName | null {
+  if (saleChannel === "48") {
+    const brand = STORE_BRAND[store];
+    if (brand === "TDG") return "TikTok TDG";
+    if (brand === "TDQ") return "TikTok TDQ";
+    return "TikTok TDG"; // store lạ -> gộp tạm vào TDG
+  }
+  return SALE_CHANNEL_MAP[saleChannel] ?? null;
+}
 
 /**
  * ---------------------------------------------------------------------------
@@ -64,8 +98,13 @@ export const SALE_CHANNEL_MAP: Record<string, ChannelName> = {
  *     (60 là status áp đảo -> nhiều khả năng "Đã giao/Thành công".)
  * ---------------------------------------------------------------------------
  */
-export const STATUS_SUCCESS = ["60"]; // ["60"]  đơn thành công
-export const STATUS_CANCELLED = ["63", "72"]; // huỷ + hoàn (xác nhận lại)
+// Theo tài liệu Nhanh.vn API v3.0 (đối soát nội bộ TDG):
+//   Thành công = 60
+//   Hoàn       = 71 (đang hoàn), 72 (đã hoàn), 74 (xác nhận hoàn)
+//   Huỷ        = 58 (NVC huỷ), 63 (khách huỷ), 64 (hệ thống huỷ)
+//   Tổng đơn (tạm tính) = 54,55,56,57,42,40,43,59,68,73 (+ các nhóm trên)
+export const STATUS_SUCCESS = ["60"];
+export const STATUS_CANCELLED = ["71", "72", "74", "58", "63", "64"]; // hoàn + huỷ
 // "created" = mọi đơn, không cần khai báo.
 
 /**
@@ -74,7 +113,10 @@ export const STATUS_CANCELLED = ["63", "72"]; // huỷ + hoàn (xác nhận lạ
  *  Doanh thu mỗi đơn = SUM(product_price * product_qty) trừ discount  (grain = line item)
  *  Giá vốn (COGS)    = SUM(product_avg_cost * product_qty)
  *  Mốc thời gian lọc theo ngày: created_at (đơn tạo) / success_at (đơn thành công).
- *  ⚠️ success_at hiện rỗng trong data -> tạm dùng created_at cho cả 3 nhóm.
+ *  ⚠️ KIỂM CHỨNG THỰC TẾ (BigQuery): success_at RỖNG 100% -> KHÔNG lọc theo
+ *     "ngày thành công" được (dù Nhanh khuyến nghị) -> dùng created_at cho cả 3 nhóm.
+ *  ⚠️ Bảng orders_* bị NHÂN ĐÔI dòng (~1.94x) -> query phải DEDUPE trước khi cộng,
+ *     nếu không doanh thu & giá vốn sẽ bị gấp đôi (đã xử lý trong scripts/build-data.ts).
  * ---------------------------------------------------------------------------
  */
 export const NHANH_DATE_COL = "created_at"; // dùng để lọc theo ngày báo cáo
