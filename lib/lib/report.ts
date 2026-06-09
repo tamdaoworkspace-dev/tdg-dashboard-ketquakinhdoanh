@@ -156,3 +156,28 @@ export function aggregateReports(
     notes,
   });
 }
+
+/**
+ * Tính lại PHÍ SÀN theo % người dùng nhập trên dashboard (chạy ở trình duyệt).
+ * pct: phân số theo kênh, vd { "Shopee": 0.1, "TikTok TDG": 0.05, "TikTok TDQ": 0.05 }.
+ * Phí sàn mỗi kênh = pct × DT thuần (cod). Cập nhật lại dòng 9 (Phí sàn) và 10 (LN tạm tính).
+ */
+export function applyPlatformFeePct(
+  report: _Report,
+  pct: Record<string, number>
+): _Report {
+  const channels = report.channels.map((c) => ({
+    ...c,
+    platformFee: (pct[c.name] || 0) * (c.cod || 0),
+  }));
+  const fee = channels.reduce((a, c) => a + c.platformFee, 0);
+  const val = (no: number) => report.pnl.find((p) => p.no === no)?.value || 0;
+  const netProfit = val(5) - val(6) - val(7) - val(8) - fee; // 10 = 5−6−7−8−9
+  const pnl = report.pnl.map((p) =>
+    p.no === 9 ? { ...p, value: fee } : p.no === 10 ? { ...p, value: netProfit } : p
+  );
+  const costBreakdown = report.costBreakdown.map((x) =>
+    x.label === "Phí sàn" ? { ...x, value: fee } : x
+  );
+  return { ...report, channels, pnl, costBreakdown };
+}
