@@ -124,26 +124,36 @@ export const NHANH_DATE_COL = "created_at"; // dùng để lọc theo ngày báo
 /**
  * ---------------------------------------------------------------------------
  *  CHI PHÍ ADS (màu "báo cáo Ads") -> tổng vào dòng "8. Chi phí quảng cáo"
- *  Nguồn ứng viên (asia-southeast1):
- *    Facebook : facebook_ads_dwh.facebook_ads_ads_insights        (spend)
- *    Shopee   : shopee_ads_dwh.shopee_cpc_ads_daily_performance_* (expense)
- *    TikTok   : tiktok_ads_dwh.tiktok_ads_<hash>                  (spend)
- *  ⚠️ TODO XÁC NHẬN account/campaign nào thuộc kênh nào + cột spend + cột ngày.
- *  Khi chưa cấu hình -> trả 0 (hoặc dùng mock).
+ *  Nguồn ĐÃ XÁC NHẬN (đọc trong scripts/build-data.ts > fetchAdsByDay):
+ *    Facebook : facebook_ads_dwh.facebook_ads_ads_insights   (spend, date_start)  -> kênh Facebook
+ *    Shopee   : shopee_ads_dwh.shopee_cpc_ads_daily_performance_tam_dao_quan_tdg (expense, date) -> Shopee
+ *    TikTok   : tiktok_ads_dwh.tiktok_ads_gmv_max_campaign_overview_report (cost, stat_time_day)
+ *               tách theo account_name: '%tdg%' -> TikTok TDG ; '%tam dao quan%/%tdq%' -> TikTok TDQ
+ *  ⚠️ TikTok hiện chỉ gồm chiến dịch GMV Max của tài khoản "Tiktok TDG VN".
+ *     Nếu có thêm tài khoản TDQ / quảng cáo thường (bảng tiktok_ads_<hash>) thì bổ sung sau.
  * ---------------------------------------------------------------------------
  */
-export const ADS_ENABLED = false;
+export const ADS_ENABLED = true;
 
 /**
  * ---------------------------------------------------------------------------
  *  PHÍ SÀN (màu "Sàn") -> tổng vào dòng "9. Phí sàn TMĐT"
- *  Nguồn ứng viên:
- *    Shopee : shopee_dwh.shopee_payment_escrow_detail_* (các cột fee/commission)
- *    TikTok : tiktok_shop_dwh.* (statement / settlement)
- *  ⚠️ TODO XÁC NHẬN cột phí + cách khớp theo ngày.
+ *  Cách dùng: ĐIỀN % CỐ ĐỊNH cho từng sàn ở PLATFORM_FEE_PCT bên dưới.
+ *  Phí sàn mỗi kênh = % × DT thuần (cod) của kênh đó trong ngày.
+ *  (Sau này nếu có bảng đối soát Shopee/TikTok thật thì thay bằng số thực.)
  * ---------------------------------------------------------------------------
  */
-export const PLATFORM_FEE_ENABLED = false;
+export const PLATFORM_FEE_ENABLED = true;
+
+/**
+ *  % phí sàn cố định theo kênh — SỬA SỐ NÀY CHO ĐÚNG VỚI SHOP CỦA BẠN.
+ *  Ví dụ 0.10 = 10%. Kênh không khai = 0 (không tính phí).
+ */
+export const PLATFORM_FEE_PCT: Partial<Record<ChannelName, number>> = {
+  "Shopee": 0.10,       // ← ĐIỀN % phí Shopee thật
+  "TikTok TDG": 0.05,   // ← ĐIỀN % phí TikTok thật
+  "TikTok TDQ": 0.05,   // ← ĐIỀN % phí TikTok thật
+};
 
 /**
  * ---------------------------------------------------------------------------
