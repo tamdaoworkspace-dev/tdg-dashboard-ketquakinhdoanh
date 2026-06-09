@@ -2,7 +2,8 @@
 import { useEffect, useMemo, useState, useCallback } from "react";
 import type { Report } from "@/lib/types";
 import { fmtVND, fmtInt, fmtPct } from "@/lib/types";
-import { aggregateReports } from "@/lib/report";
+import { aggregateReports, applyPlatformFeePct } from "@/lib/report";
+import { PLATFORM_FEE_PCT } from "@/lib/config";
 import { Header } from "@/components/Header";
 import { KPICard, IconRevenue, IconProfit, IconOrders, IconMargin } from "@/components/KPICard";
 import { ChannelTable } from "@/components/ChannelTable";
@@ -18,6 +19,14 @@ export default function Dashboard() {
   const [channel, setChannel] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  // % phí sàn người dùng nhập (mặc định lấy từ config)
+  const [shopeePct, setShopeePct] = useState((PLATFORM_FEE_PCT["Shopee"] || 0) * 100);
+  const [tiktokPct, setTiktokPct] = useState((PLATFORM_FEE_PCT["TikTok TDG"] || 0) * 100);
+  const feePct = useMemo(() => ({
+    "Shopee": (shopeePct || 0) / 100,
+    "TikTok TDG": (tiktokPct || 0) / 100,
+    "TikTok TDQ": (tiktokPct || 0) / 100,
+  }), [shopeePct, tiktokPct]);
 
   const loadData = useCallback(async () => {
     setLoading(true); setErr(null);
@@ -42,20 +51,23 @@ export default function Dashboard() {
   // báo cáo tổng hợp theo khoảng ngày + cross-filter kênh
   const data = useMemo(() => {
     if (!bundle || !from || !to) return null;
-    return aggregateReports(bundle.days, from, to, channel);
-  }, [bundle, from, to, channel]);
+    return applyPlatformFeePct(aggregateReports(bundle.days, from, to, channel), feePct);
+  }, [bundle, from, to, channel, feePct]);
 
   // đường xu hướng theo từng ngày trong khoảng đã chọn
   const trend = useMemo(() => {
     if (!bundle) return [];
     return bundle.days
       .filter((d) => d.fromDate >= from && d.fromDate <= to)
-      .map((d) => ({
-        date: d.fromDate,
-        revenue: d.pnl.find((p) => p.no === 3)?.value || 0,
-        profit: d.pnl.find((p) => p.no === 10)?.value || 0,
-      }));
-  }, [bundle, from, to]);
+      .map((d) => {
+        const dd = applyPlatformFeePct(d, feePct);
+        return {
+          date: d.fromDate,
+          revenue: dd.pnl.find((p) => p.no === 3)?.value || 0,
+          profit: dd.pnl.find((p) => p.no === 10)?.value || 0,
+        };
+      });
+  }, [bundle, from, to, feePct]);
 
   const toggleChannel = (name: string) => setChannel((c) => (c === name ? null : name));
 
@@ -85,6 +97,26 @@ export default function Dashboard() {
             className="text-sm font-medium px-3 py-2 rounded-ios border border-tdg-border text-tdg-secondary hover:bg-tdg-card-alt transition-colors">
             Toàn kỳ
           </button>
+
+          <div className="flex items-end gap-2 ml-1 pl-3 border-l border-tdg-border">
+            <label className="text-xs text-tdg-secondary">% Phí Shopee
+              <div className="relative mt-1">
+                <input type="number" min={0} max={100} step={0.1} value={shopeePct}
+                  onChange={(e) => setShopeePct(parseFloat(e.target.value) || 0)}
+                  className={`${inputCls} w-24 pr-6`} />
+                <span className="absolute right-2 top-1/2 -translate-y-1/2 text-tdg-secondary text-sm">%</span>
+              </div>
+            </label>
+            <label className="text-xs text-tdg-secondary">% Phí TikTok
+              <div className="relative mt-1">
+                <input type="number" min={0} max={100} step={0.1} value={tiktokPct}
+                  onChange={(e) => setTiktokPct(parseFloat(e.target.value) || 0)}
+                  className={`${inputCls} w-24 pr-6`} />
+                <span className="absolute right-2 top-1/2 -translate-y-1/2 text-tdg-secondary text-sm">%</span>
+              </div>
+            </label>
+          </div>
+
           <button onClick={loadData}
             className="bg-tdg-accent text-white text-sm font-semibold px-4 py-2 rounded-ios hover:bg-tdg-accent-dark transition-colors inline-flex items-center gap-2">
             <svg className={`w-4 h-4 ${loading ? "spin" : ""}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
