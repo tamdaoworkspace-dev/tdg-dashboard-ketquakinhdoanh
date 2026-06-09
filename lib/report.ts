@@ -32,16 +32,17 @@ export function buildReport(args: {
     cancelOrders: sum((c) => c.cancelled.orders), // E14
     cancelRevenue: sum((c) => c.cancelled.revenue), // F14
     successOrders: sum((c) => c.success.orders), // H14
-    successRevenue: sum((c) => c.success.revenue), // I14
+    successRevenue: sum((c) => c.success.revenue), // I14 = giá×SL (gross)
+    cod: sum((c) => c.cod || 0), // tổng cod đơn thành công (tiền thực thu)
     cogs: sum((c) => c.cogs), // K14
     ads: sum((c) => c.adsCost), // L14
     fee: sum((c) => c.platformFee), // M14
   };
 
   // ----- Phần 2: KQHĐKD -----
-  const revenue = T.successRevenue; // 1. Doanh thu bán hàng = I14
-  const deductions = T.cancelRevenue; // 2. Giảm trừ = F14
-  const netRevenue = revenue - deductions; // 3. DTT
+  const revenue = T.successRevenue; // 1. Doanh thu bán hàng = Σ(giá×SL) đơn TC
+  const deductions = T.successRevenue - T.cod; // 2. Giảm trừ = Σ(giá×SL) − Σ(cod)
+  const netRevenue = revenue - deductions; // 3. DTT = Σ(cod) (tiền thực thu, gồm VAT)
   const cogs = T.cogs; // 4. Giá vốn = K14
   const grossProfit = netRevenue - cogs; // 5. LN gộp
   const salary = salaryDaily; // 6. Lương (Sheet)
@@ -87,7 +88,7 @@ export const successShare = (c: ChannelRow, totalSuccessRev: number) =>
 
 /** Lợi nhuận kênh (cột N). */
 export const channelProfit = (c: ChannelRow) =>
-  c.success.revenue - c.cogs - c.adsCost - c.platformFee;
+  (c.cod ?? c.success.revenue) - c.cogs - c.adsCost - c.platformFee;
 
 /* ------------------------- Gộp nhiều ngày & cross-filter ------------------------- */
 import type { Report as _Report } from "./types";
@@ -102,7 +103,7 @@ export function mergeChannels(daysChannels: ChannelRow[][]): ChannelRow[] {
       created: { orders: 0, revenue: 0 },
       cancelled: { orders: 0, revenue: 0 },
       success: { orders: 0, revenue: 0 },
-      cogs: 0, adsCost: 0, platformFee: 0,
+      cogs: 0, adsCost: 0, platformFee: 0, cod: 0,
     };
     for (const day of daysChannels) {
       const c = day.find((x) => x.name === name);
@@ -111,6 +112,7 @@ export function mergeChannels(daysChannels: ChannelRow[][]): ChannelRow[] {
       acc.cancelled.orders += c.cancelled.orders; acc.cancelled.revenue += c.cancelled.revenue;
       acc.success.orders += c.success.orders; acc.success.revenue += c.success.revenue;
       acc.cogs += c.cogs; acc.adsCost += c.adsCost; acc.platformFee += c.platformFee;
+      acc.cod = (acc.cod || 0) + (c.cod || 0);
     }
     return acc;
   });
