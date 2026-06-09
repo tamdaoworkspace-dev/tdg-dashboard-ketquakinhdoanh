@@ -4,8 +4,9 @@ export interface ChannelRow {
   name: string;
   created: { orders: number; revenue: number }; // Đơn tạo  (B,C)  [Nhanh]
   cancelled: { orders: number; revenue: number }; // Đơn hoàn/huỷ (E,F) [Nhanh]
-  success: { orders: number; revenue: number }; // Đơn thành công (H,I) [Nhanh]
-  cogs: number; // Giá vốn (K)        [Nhanh]
+  success: { orders: number; revenue: number }; // Đơn thành công (H,I) [Nhanh] - revenue = giá×SL (gross)
+  cod?: number; // Tổng cod_amount đơn thành công (tiền khách thực trả, gồm VAT) [Nhanh]
+  cogs: number; // Giá vốn (K) = giá nhập × SL  [Nhanh: orders×products]
   adsCost: number; // Chi phí Ads (L)  [Ads]
   platformFee: number; // Phí sàn (M)  [Sàn]
 }
