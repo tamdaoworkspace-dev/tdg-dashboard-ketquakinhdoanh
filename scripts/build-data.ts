@@ -147,10 +147,10 @@ async function fetchMonthlyCosts() {
   for (const r of res.data.values || []) {
     const ym = String(r[0]).trim();
     if (!/^\d{4}-\d{2}$/.test(ym)) continue;
-    map[ym] = {
-      salary: Number(String(r[1]).replace(/[^\d.-]/g, "")) || 0,
-      opex: Number(String(r[2]).replace(/[^\d.-]/g, "")) || 0,
-    };
+    if (!map[ym]) map[ym] = { salary: 0, opex: 0 };
+    // CỘNG DỒN: nhiều dòng cùng 1 tháng -> tổng lại (không ghi đè)
+    map[ym].salary += Number(String(r[1]).replace(/[^\d.-]/g, "")) || 0;
+    map[ym].opex += Number(String(r[2]).replace(/[^\d.-]/g, "")) || 0;
   }
   return map;
 }
