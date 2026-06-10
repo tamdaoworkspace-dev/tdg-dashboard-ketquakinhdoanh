@@ -198,7 +198,7 @@ async function main() {
       const ch = resolveChannel(String(r.store), String(r.sale_channel)); if (!ch) continue;
       const row = m.get(ch)!;
       const orders = Number(r.orders) || 0, revenue = Number(r.revenue) || 0, cogs = Number(r.cogs) || 0, cod = Number(r.cod) || 0;
-      const st = String(r.order_status);
+      const st = String(r.order_status).trim();
       row.created.orders += orders; row.created.revenue += revenue;
       if (STATUS_SUCCESS.includes(st)) { row.success.orders += orders; row.success.revenue += revenue; row.cogs += cogs; row.cod = (row.cod || 0) + cod; }
       else if (STATUS_CANCELLED.includes(st)) { row.cancelled.orders += orders; row.cancelled.revenue += revenue; }
