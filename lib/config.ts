@@ -103,8 +103,14 @@ export function resolveChannel(store: string, saleChannel: string): ChannelName 
 //   Hoàn       = 71 (đang hoàn), 72 (đã hoàn), 74 (xác nhận hoàn)
 //   Huỷ        = 58 (NVC huỷ), 63 (khách huỷ), 64 (hệ thống huỷ)
 //   Tổng đơn (tạm tính) = 54,55,56,57,42,40,43,59,68,73 (+ các nhóm trên)
-export const STATUS_SUCCESS = ["60"];
-export const STATUS_CANCELLED = ["71", "72", "74", "58", "63", "64"]; // hoàn + huỷ
+// ⚠️ Nhanh đổi định dạng: đơn CŨ dùng mã số ("60","71"...), đơn MỚI dùng CHỮ tiếng Việt.
+// Khai cả 2 để không sót.
+export const STATUS_SUCCESS = ["60", "Thành công"];
+export const STATUS_CANCELLED = [
+  "71", "72", "74", "58", "63", "64",                 // mã số cũ (hoàn + huỷ)
+  "Hủy đơn", "Hệ thống hủy", "HVC hủy",                // huỷ (chữ mới)
+  "Đã hoàn hàng", "Đang chuyển hoàn",                  // hoàn (chữ mới)
+];
 // "created" = mọi đơn, không cần khai báo.
 
 /**
